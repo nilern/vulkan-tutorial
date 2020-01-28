@@ -92,6 +92,8 @@ private:
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkDevice device;
+    VkQueue graphicsQueue;
 
     void initWindow() {
         glfwInit();
@@ -105,6 +107,7 @@ private:
         createInstance();
         setupDebugMessenger();
         pickPhysicalDevice();
+        createLogicalDevice();
     }
 
     void createInstance() {
@@ -228,6 +231,38 @@ private:
         return indices.isComplete();
     }
 
+    void createLogicalDevice() {
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+        float queuePriority = 1.0f;
+        VkDeviceQueueCreateInfo queueCreateInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = indices.graphicsFamily.value(),
+            .queueCount = 1,
+            .pQueuePriorities = &queuePriority
+        };
+
+        VkPhysicalDeviceFeatures deviceFeatures = {};
+        VkDeviceCreateInfo createInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            .queueCreateInfoCount = 1,
+            .pQueueCreateInfos = &queueCreateInfo,
+            .enabledExtensionCount = 0,
+            .pEnabledFeatures = &deviceFeatures,
+        };
+        if (enableValidationLayers)  {
+            createInfo.enabledLayerCount = sizeof(validationLayers) / sizeof (validationLayers[0]);
+            createInfo.ppEnabledLayerNames = validationLayers;
+        } else {
+            createInfo.enabledLayerCount = sizeof(validationLayers) / sizeof (validationLayers[0]);
+        }
+
+        if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create logical device!");
+        }
+        vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+    }
+
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
@@ -235,6 +270,8 @@ private:
     }
 
     void cleanup() {
+        vkDestroyDevice(device, nullptr);
+
         if (enableValidationLayers) {
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
